@@ -13,6 +13,7 @@
 #include <QTableWidget>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QSpinBox>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -34,7 +35,8 @@ private:
     void setupCharts();
     QHBoxLayout *chartRow;
     QTextEdit *mapContentView;
-
+    QSpinBox *greenMinSpin;
+    QSpinBox *yellowMinSpin;
 
     void analyzeFile(const QString &filePath);
     void showPieChart(QtCharts::QChartView *view, const QString &title, double used, double total);

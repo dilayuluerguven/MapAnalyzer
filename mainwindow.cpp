@@ -41,8 +41,71 @@ MainWindow::MainWindow(QWidget *parent)
     mainLayout->addWidget(dropLabel);
 
     connect(dropLabel, &ClickableLabel::clicked, this, &MainWindow::openFileDialog);
+    QHBoxLayout *thresholdLayout = new QHBoxLayout();
 
-    // Bellek tablosu
+    greenMinSpin = new QSpinBox(this);
+    greenMinSpin->setRange(0, 100);
+    greenMinSpin->setValue(60);
+    greenMinSpin->setStyleSheet(
+        "QSpinBox {"
+        "   background-color: #f8f9fa;"
+        "   border: 1px solid #d3dce6;"
+        "   border-radius: 4px;"
+        "   padding: 5px;"
+        "   min-width: 60px;"
+        "margin-right: 15px;"
+        "}"
+        "QSpinBox::up-button {"
+        "   subcontrol-origin: border;"
+        "   subcontrol-position: top right;"
+        "   width: 20px;"
+        "   border-left: 1px solid #d3dce6;"
+        "   border-bottom: 1px solid #d3dce6;"
+        "   border-top-right-radius: 4px;"
+        "   background-color: #e9ecef;"
+        "}"
+        "QSpinBox::down-button {"
+        "   subcontrol-origin: border;"
+        "   subcontrol-position: bottom right;"
+        "   width: 20px;"
+        "   border-left: 1px solid #d3dce6;"
+        "   border-bottom-right-radius: 4px;"
+        "   background-color: #e9ecef;"
+        "}"
+        "QSpinBox::up-button:hover, QSpinBox::down-button:hover {"
+        "   background-color: #dee2e6;"
+        "}"
+        "QSpinBox::up-arrow, QSpinBox::down-arrow {"
+        "   width: 7px;"
+        "   height: 7px;"
+        "}"
+    );
+
+    yellowMinSpin = new QSpinBox(this);
+    yellowMinSpin->setRange(0, 100);
+    yellowMinSpin->setValue(40);
+    yellowMinSpin->setStyleSheet(greenMinSpin->styleSheet());
+
+    QLabel *greenLabel = new QLabel("Yeşil sınır (%):", this);
+    greenLabel->setStyleSheet("QLabel { color: #2d3748; font-weight: bold; }");
+
+    QLabel *yellowLabel = new QLabel("Sarı sınır (%):", this);
+    yellowLabel->setStyleSheet(greenLabel->styleSheet());
+
+    thresholdLayout->addWidget(greenLabel);
+    thresholdLayout->addWidget(greenMinSpin);
+    thresholdLayout->addSpacing(15);
+    thresholdLayout->addWidget(yellowLabel);
+    thresholdLayout->addWidget(yellowMinSpin);
+    thresholdLayout->addStretch();
+
+    connect(greenMinSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::updateMemoryTable);
+    connect(yellowMinSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::updateMemoryTable);
+
+    mainLayout->insertLayout(1, thresholdLayout);
+
     memoryTable = new QTableWidget(this);
     memoryTable->setColumnCount(5);
     memoryTable->setHorizontalHeaderLabels({"Bellek Türü", "Toplam (KB)", "Kullanılan (KB)", "Boş (KB)", "Kullanım %"});
@@ -79,7 +142,6 @@ MainWindow::MainWindow(QWidget *parent)
                                    "QPushButton:hover { background-color: #2980b9; }");
     connect(showChartsButton, &QPushButton::clicked, this, &MainWindow::showCharts);
 
-    // Grafikler
     chartRow = new QHBoxLayout();
     stackChartView = new QtCharts::QChartView();
     flashChartView = new QtCharts::QChartView();
@@ -124,14 +186,19 @@ void MainWindow::updateMemoryTable() {
         memoryTable->setItem(row, 3, new QTableWidgetItem(QString::number(free, 'f', 2)));
         memoryTable->setItem(row, 4, new QTableWidgetItem(QString("%1%").arg(QString::number(percent, 'f', 2))));
 
+        int greenMin = greenMinSpin->value();
+        int yellowMin = yellowMinSpin->value();
+
         QTableWidgetItem *percentItem = memoryTable->item(row, 4);
-        if (percent > 80) {
-            percentItem->setBackground(QColor("#ff6b6b"));
-        } else if (percent > 60) {
+
+        if (percent >= greenMin) {
+            percentItem->setBackground(QColor("#06d6a0"));
+        } else if (percent >= yellowMin) {
             percentItem->setBackground(QColor("#ffd166"));
         } else {
-            percentItem->setBackground(QColor("#06d6a0"));
+            percentItem->setBackground(QColor("#ff6b6b"));
         }
+
     };
 
     addRow(0, "STACK", lastStats.stackUsed, lastStats.stackTotal);
