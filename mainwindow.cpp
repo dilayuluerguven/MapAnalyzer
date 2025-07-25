@@ -29,6 +29,13 @@ MainWindow::MainWindow(QWidget *parent)
       toolBar->addAction(QIcon(":/icons/excel.png"), "Excel'e Kaydet", this, &MainWindow::exportToExcel);
       toolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
 
+      QAction *stackAction = toolBar->addAction("STACK");
+      QAction *flashAction = toolBar->addAction("FLASH");
+      QAction *ramAction = toolBar->addAction("RAM");
+
+
+
+
     QWidget *central = new QWidget(this);
     mainLayout = new QVBoxLayout(central);
 
@@ -154,6 +161,18 @@ MainWindow::MainWindow(QWidget *parent)
     flashChartView->setVisible(false);
     ramChartView->setVisible(false);
 
+    connect(stackAction, &QAction::triggered, this, [this]() {
+        MemoryDetailDialog dlg("STACK", lastStats.stackUsed, lastStats.stackTotal, this);
+        dlg.exec();
+    });
+    connect(flashAction, &QAction::triggered, this, [this]() {
+        MemoryDetailDialog dlg("FLASH", lastStats.flashUsed, lastStats.flashTotal, this);
+        dlg.exec();
+    });
+    connect(ramAction, &QAction::triggered, this, [this]() {
+        MemoryDetailDialog dlg("RAM", lastStats.ramUsed, lastStats.ramTotal, this);
+        dlg.exec();
+    });
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->addWidget(showChartsButton);
     buttonLayout->addStretch();

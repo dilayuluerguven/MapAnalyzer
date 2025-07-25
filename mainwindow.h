@@ -14,6 +14,7 @@
 #include <QPushButton>
 #include <QTextEdit>
 #include <QSpinBox>
+#include "MemoryDetailDialog.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
