@@ -88,6 +88,39 @@ MainWindow::MainWindow(QWidget *parent)
         "}"
     );
 
+
+    memoryTable = new QTableWidget(this);
+    memoryTable->setColumnCount(5);
+    memoryTable->setHorizontalHeaderLabels({"Bellek Türü", "Toplam (KB)", "Kullanılan (KB)", "Boş (KB)", "Kullanım %"});
+    memoryTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    memoryTable->setStyleSheet("QTableWidget { background-color: #f8f9fa; border: 1px solid #ddd; }"
+                               "QHeaderView::section { background-color: #3498db; color: white; padding: 5px; }");
+    memoryTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    memoryTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    memoryTable->setSelectionMode(QAbstractItemView::SingleSelection);
+
+
+    initializeMemoryTable();
+
+    mapContentView = new QTextEdit(this);
+    mapContentView->setReadOnly(true);
+    mapContentView->setStyleSheet(
+        "QTextEdit {"
+        "   background: #f5f7fa;"
+        "   border: 1px solid #d3dce6;"
+        "   border-radius: 4px;"
+        "   font-family: 'Consolas', monospace;"
+        "   font-size: 16px;"
+        "   color: #2d3748;"
+        "   padding: 6px;"
+        "   line-height: 1.3;"
+        "}"
+        "QScrollBar:vertical { width: 10px; background: #edf2f7; }"
+        "QScrollBar::handle:vertical { background: #c1ccdb; min-height: 30px; }"
+    );
+    mapContentView->setPlaceholderText("📋 .map dosyası içeriği burada gösterilecek...");
+    mapContentView->setFixedHeight(150);
+    mainLayout->addWidget(mapContentView);
     yellowMinSpin = new QSpinBox(this);
     yellowMinSpin->setRange(0, 100);
     yellowMinSpin->setValue(40);
@@ -111,38 +144,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(yellowMinSpin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MainWindow::updateMemoryTable);
 
-    mainLayout->insertLayout(1, thresholdLayout);
+    mainLayout->addLayout(thresholdLayout);
 
-    memoryTable = new QTableWidget(this);
-    memoryTable->setColumnCount(5);
-    memoryTable->setHorizontalHeaderLabels({"Bellek Türü", "Toplam (KB)", "Kullanılan (KB)", "Boş (KB)", "Kullanım %"});
-    memoryTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    memoryTable->setStyleSheet("QTableWidget { background-color: #f8f9fa; border: 1px solid #ddd; }"
-                               "QHeaderView::section { background-color: #3498db; color: white; padding: 5px; }");
-    memoryTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    memoryTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    memoryTable->setSelectionMode(QAbstractItemView::SingleSelection);
-
-    initializeMemoryTable();
-    mapContentView = new QTextEdit(this);
-    mapContentView->setReadOnly(true);
-    mapContentView->setStyleSheet(
-        "QTextEdit {"
-        "   background: #f5f7fa;"
-        "   border: 1px solid #d3dce6;"
-        "   border-radius: 4px;"
-        "   font-family: 'Consolas', monospace;"
-        "   font-size: 16px;"
-        "   color: #2d3748;"
-        "   padding: 6px;"
-        "   line-height: 1.3;"
-        "}"
-        "QScrollBar:vertical { width: 10px; background: #edf2f7; }"
-        "QScrollBar::handle:vertical { background: #c1ccdb; min-height: 30px; }"
-    );
-    mapContentView->setPlaceholderText("📋 .map dosyası içeriği burada gösterilecek...");
-    mapContentView->setFixedHeight(150);
-    mainLayout->addWidget(mapContentView);
 
     QPushButton *showChartsButton = new QPushButton("Grafikleri Göster", this);
     showChartsButton->setStyleSheet("QPushButton { background-color: #3498db; color: white; padding: 8px; border-radius: 4px; }"
