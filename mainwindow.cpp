@@ -7,13 +7,16 @@
 #include <QMessageBox>
 #include <QFile>
 #include <QTextStream>
-#include "xlsxdocument.h" // QXlsx
+#include "xlsxdocument.h"
 #include <QGraphicsDropShadowEffect>
 #include <QPropertyAnimation>
 #include <QHeaderView>
 #include <QPushButton>
 #include <QToolBar>
 #include <QDesktopServices>
+#include <QCoreApplication>
+#include <QSettings>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),chartRow(nullptr) {
@@ -27,14 +30,13 @@ MainWindow::MainWindow(QWidget *parent)
     QToolBar *toolBar = addToolBar("Araçlar");
       toolBar->addAction(QIcon(":/icons/open.png"), "Dosya Aç", this, &MainWindow::openFileDialog);
       toolBar->addAction(QIcon(":/icons/excel.png"), "Excel'e Kaydet", this, &MainWindow::exportToExcel);
+      toolBar->addAction(QIcon(":/icons/help.png"), "Kullanım Kılavuzu", this, &MainWindow::openUserGuide);
       toolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+      toolBar->addAction(QIcon(":/icons/fullscreen.png"), "Map Dosyasını Göster", this, &MainWindow::openMapFullScreen);
 
       QAction *stackAction = toolBar->addAction("STACK");
       QAction *flashAction = toolBar->addAction("FLASH");
       QAction *ramAction = toolBar->addAction("RAM");
-
-
-
 
     QWidget *central = new QWidget(this);
     mainLayout = new QVBoxLayout(central);
@@ -49,45 +51,46 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(dropLabel, &ClickableLabel::clicked, this, &MainWindow::openFileDialog);
     QHBoxLayout *thresholdLayout = new QHBoxLayout();
-
-    greenMinSpin = new QSpinBox(this);
-    greenMinSpin->setRange(0, 100);
-    greenMinSpin->setValue(60);
-    greenMinSpin->setStyleSheet(
+    thresholdSpin = new QSpinBox(this);
+    thresholdSpin->setRange(0, 100);
+    thresholdSpin->setValue(50);
+    thresholdSpin->setStyleSheet(
         "QSpinBox {"
         "   background-color: #f8f9fa;"
         "   border: 1px solid #d3dce6;"
         "   border-radius: 4px;"
-        "   padding: 5px;"
-        "   min-width: 60px;"
-        "margin-right: 15px;"
-        "}"
+        "   min-width: 72px;"
+        "   min-height: 36px;"
         "QSpinBox::up-button {"
+        "   width: 40px;"
         "   subcontrol-origin: border;"
         "   subcontrol-position: top right;"
-        "   width: 20px;"
         "   border-left: 1px solid #d3dce6;"
-        "   border-bottom: 1px solid #d3dce6;"
-        "   border-top-right-radius: 4px;"
-        "   background-color: #e9ecef;"
+        "   background-image: url(:/icons/plus.svg);"
+        "   background-repeat: no-repeat;"
+        "   background-position: center;"
         "}"
         "QSpinBox::down-button {"
+        "   width: 40px;"
         "   subcontrol-origin: border;"
         "   subcontrol-position: bottom right;"
-        "   width: 20px;"
         "   border-left: 1px solid #d3dce6;"
-        "   border-bottom-right-radius: 4px;"
-        "   background-color: #e9ecef;"
+        "   background-image: url(:/icons/minus.svg);"
+        "   background-repeat: no-repeat;"
+        "   background-position: center;"
         "}"
-        "QSpinBox::up-button:hover, QSpinBox::down-button:hover {"
-        "   background-color: #dee2e6;"
-        "}"
-        "QSpinBox::up-arrow, QSpinBox::down-arrow {"
-        "   width: 7px;"
-        "   height: 7px;"
         "}"
     );
 
+    QLabel *thresholdLabel = new QLabel("Geçme sınırı (%):", this);
+    thresholdLabel->setStyleSheet("QLabel { color: #2d3748; font-weight: bold; }");
+
+    thresholdLayout->addWidget(thresholdLabel);
+    thresholdLayout->addWidget(thresholdSpin);
+    thresholdLayout->addStretch();
+
+    connect(thresholdSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &MainWindow::updateMemoryTable);
 
     memoryTable = new QTableWidget(this);
     memoryTable->setColumnCount(5);
@@ -118,34 +121,10 @@ MainWindow::MainWindow(QWidget *parent)
         "QScrollBar:vertical { width: 10px; background: #edf2f7; }"
         "QScrollBar::handle:vertical { background: #c1ccdb; min-height: 30px; }"
     );
-    mapContentView->setPlaceholderText("📋 .map dosyası içeriği burada gösterilecek...");
-    mapContentView->setFixedHeight(150);
+    mapContentView->setFixedHeight(0);
     mainLayout->addWidget(mapContentView);
-    yellowMinSpin = new QSpinBox(this);
-    yellowMinSpin->setRange(0, 100);
-    yellowMinSpin->setValue(40);
-    yellowMinSpin->setStyleSheet(greenMinSpin->styleSheet());
-
-    QLabel *greenLabel = new QLabel("Yeşil sınır (%):", this);
-    greenLabel->setStyleSheet("QLabel { color: #2d3748; font-weight: bold; }");
-
-    QLabel *yellowLabel = new QLabel("Sarı sınır (%):", this);
-    yellowLabel->setStyleSheet(greenLabel->styleSheet());
-
-    thresholdLayout->addWidget(greenLabel);
-    thresholdLayout->addWidget(greenMinSpin);
-    thresholdLayout->addSpacing(15);
-    thresholdLayout->addWidget(yellowLabel);
-    thresholdLayout->addWidget(yellowMinSpin);
-    thresholdLayout->addStretch();
-
-    connect(greenMinSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &MainWindow::updateMemoryTable);
-    connect(yellowMinSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &MainWindow::updateMemoryTable);
 
     mainLayout->addLayout(thresholdLayout);
-
 
     QPushButton *showChartsButton = new QPushButton("Grafikleri Göster", this);
     showChartsButton->setStyleSheet("QPushButton { background-color: #3498db; color: white; padding: 8px; border-radius: 4px; }"
@@ -186,10 +165,76 @@ MainWindow::MainWindow(QWidget *parent)
     setCentralWidget(central);
 }
 
+
 void MainWindow::initializeMemoryTable() {
     memoryTable->setRowCount(0);
     lastStats = {};
 }
+
+
+void MainWindow::openMapFullScreen() {
+    if (mapContentView->toPlainText().isEmpty()) {
+        QMessageBox::information(this, "Uyarı", "Henüz yüklenmiş bir dosya yok.");
+        return;
+    }
+
+    QDialog *dialog = new QDialog(this);
+    dialog->setWindowTitle("Dosya İçeriği - Tam Ekran");
+    dialog->resize(1000, 700);
+    dialog->setWindowState(Qt::WindowFullScreen);
+
+    QTextEdit *fullScreenView = new QTextEdit(dialog);
+    fullScreenView->setReadOnly(true);
+    fullScreenView->setPlainText(mapContentView->toPlainText());
+    fullScreenView->setStyleSheet(mapContentView->styleSheet());
+
+    QPushButton *closeButton = new QPushButton("✖", dialog);
+    closeButton->setFixedSize(18, 18);
+    closeButton->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #e74c3c;"
+        "   color: white;"
+        "   border: none;"
+        "   border-radius: 9px;"
+        "   font-weight: bold;"
+        "   font-size: 12px;"
+        "}"
+        "QPushButton:hover {"
+        "   background-color: #c0392b;"
+        "}"
+    );
+    connect(closeButton, &QPushButton::clicked, dialog, &QDialog::close);
+
+    QVBoxLayout *layout = new QVBoxLayout(dialog);
+
+    QHBoxLayout *topLayout = new QHBoxLayout();
+    topLayout->addStretch();
+    topLayout->addWidget(closeButton);
+
+    layout->addLayout(topLayout);
+    layout->addWidget(fullScreenView);
+    dialog->setLayout(layout);
+
+    dialog->exec();
+}
+
+
+void MainWindow::openUserGuide() {
+    QString appDir = QCoreApplication::applicationDirPath();
+    QDir dir(appDir);
+    QString userGuidePath = dir.filePath("/docs/userGuide.pdf");
+
+    qDebug() << "User guide path:" << userGuidePath;  // Burada ekledik
+
+    if (QFile::exists(userGuidePath)) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(userGuidePath));
+    } else {
+        QMessageBox::warning(this, tr("Dosya Bulunamadı"),
+                             tr("Kullanım kılavuzu bulunamadı:\n%1").arg(userGuidePath));
+    }
+}
+
+
 void MainWindow::updateMemoryTable() {
     if (lastStats.stackTotal == 0 && lastStats.flashTotal == 0 && lastStats.ramTotal == 0) {
         memoryTable->setRowCount(0);
@@ -197,6 +242,8 @@ void MainWindow::updateMemoryTable() {
     }
 
     memoryTable->setRowCount(3);
+
+    int threshold = thresholdSpin->value();
 
     auto addRow = [&](int row, const QString &type, double used, double total) {
         double free = total - used;
@@ -208,25 +255,22 @@ void MainWindow::updateMemoryTable() {
         memoryTable->setItem(row, 3, new QTableWidgetItem(QString::number(free, 'f', 2)));
         memoryTable->setItem(row, 4, new QTableWidgetItem(QString("%1%").arg(QString::number(percent, 'f', 2))));
 
-        int greenMin = greenMinSpin->value();
-        int yellowMin = yellowMinSpin->value();
-
         QTableWidgetItem *percentItem = memoryTable->item(row, 4);
 
-        if (percent >= greenMin) {
-            percentItem->setBackground(QColor("#06d6a0"));
-        } else if (percent >= yellowMin) {
-            percentItem->setBackground(QColor("#ffd166"));
+        if (percent >= threshold) {
+            percentItem->setBackground(QColor("#06d6a0"));  // Yeşil - geçti
         } else {
-            percentItem->setBackground(QColor("#ff6b6b"));
+            percentItem->setBackground(QColor("#ff6b6b"));  // Kırmızı - kaldı
         }
-
     };
 
     addRow(0, "STACK", lastStats.stackUsed, lastStats.stackTotal);
     addRow(1, "FLASH", lastStats.flashUsed, lastStats.flashTotal);
     addRow(2, "RAM", lastStats.ramUsed, lastStats.ramTotal);
-}void MainWindow::showCharts()
+}
+
+
+void MainWindow::showCharts()
 {
     bool visible = !stackChartView->isVisible();
 
@@ -244,6 +288,8 @@ void MainWindow::updateMemoryTable() {
         layout()->update();
     }
 }
+
+
 void MainWindow::setupCharts()
 {
     QSizePolicy chartSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -266,7 +312,10 @@ void MainWindow::setupCharts()
     chartRow->setStretch(1, 1);
     chartRow->setStretch(2, 1);
 }
+
+
 MainWindow::~MainWindow() {}
+
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
     if (event->mimeData()->hasUrls()) {
@@ -277,9 +326,11 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
     }
 }
 
+
 void MainWindow::dragMoveEvent(QDragMoveEvent *event) {
     event->acceptProposedAction();
 }
+
 
 void MainWindow::dropEvent(QDropEvent *event) {
     QList<QUrl> urls = event->mimeData()->urls();
@@ -291,12 +342,17 @@ void MainWindow::dropEvent(QDropEvent *event) {
     }
 }
 
+
 void MainWindow::openFileDialog() {
-    QString filePath = QFileDialog::getOpenFileName(this, "Map Dosyası Seç", "", "Map Files (*.map);;All Files (*)");
+    QSettings settings("", "MapAnalyzer");
+    QString lastDir = settings.value("lastOpenDir", QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)).toString();
+    QString filePath = QFileDialog::getOpenFileName(this, "Map Dosyası Seç", lastDir, "Map Dosyaları (*.map)");
     if (!filePath.isEmpty()) {
+        settings.setValue("lastOpenDir", QFileInfo(filePath).absolutePath());
         openFile(filePath);
     }
 }
+
 
 void MainWindow::openFile(const QString &filePath) {
     lastStats = {};
@@ -311,7 +367,7 @@ void MainWindow::openFile(const QString &filePath) {
     }
 
     if (!parseMapFile(filePath, lastStats)) {
-        QMessageBox::warning(this, "Hata", "Dosya işlenirken bir hata oluştu.");
+        QMessageBox::warning(this, "Hata", "Map dosyası işlenemedi.");
         return;
     }
 
@@ -333,8 +389,9 @@ void MainWindow::openFile(const QString &filePath) {
     QFileInfo fileInfo(filePath);
     setWindowTitle("Map Analyzer - " + fileInfo.fileName());
     QMessageBox::information(this, "Başarılı",
-            QString("Dosya başarıyla yüklendi:\n%1").arg(fileInfo.fileName()));
+            QString("Dosya başarıyla yüklendi\n"));
 }
+
 
 void MainWindow::updateCharts(const QVector<QString> &lines) {
 
@@ -344,7 +401,6 @@ void MainWindow::updateCharts(const QVector<QString> &lines) {
     lastStats.flashTotal = 300.0;
     lastStats.ramUsed = 180.0;
     lastStats.ramTotal = 256.0;
-
     updateMemoryTable();
 
     if (stackChartView->isVisible()) {
@@ -353,6 +409,7 @@ void MainWindow::updateCharts(const QVector<QString> &lines) {
         showPieChart(ramChartView, "RAM", lastStats.ramUsed, lastStats.ramTotal);
     }
 }
+
 
 void MainWindow::showPieChart(QtCharts::QChartView *view, const QString &title, double used, double total) {
     using namespace QtCharts;
@@ -378,7 +435,7 @@ void MainWindow::showPieChart(QtCharts::QChartView *view, const QString &title, 
     usedSlice->setPen(pen);
     freeSlice->setPen(pen);
 
-    series->setPieSize(0.7);  // Daha küçük boyut
+    series->setPieSize(0.7);
     series->setHorizontalPosition(0.5);
     series->setVerticalPosition(0.5);
 
@@ -459,9 +516,11 @@ void MainWindow::showPieChart(QtCharts::QChartView *view, const QString &title, 
     shadowEffect->setOffset(3, 3);
     view->setGraphicsEffect(shadowEffect);
 }
+
+
 void MainWindow::exportToExcel() {
     if (lastStats.stackTotal == 0 && lastStats.flashTotal == 0 && lastStats.ramTotal == 0) {
-        QMessageBox::warning(this, "Uyarı", "Dışa aktarılacak veri bulunamadı!");
+        QMessageBox::warning(this, "Uyarı", "Veri bulunamadı!");
         return;
     }
 
@@ -502,21 +561,20 @@ void MainWindow::exportToExcel() {
         double free = total - used;
         double percent = (total > 0) ? (used * 100.0 / total) : 0.0;
 
-        // Kullanım yüzdesine göre renk formatı
-        QXlsx::Format percentFormat = dataFormat;
-        if (percent > 80) {
-            percentFormat.setPatternBackgroundColor(QColor("#ff6b6b"));
-        } else if (percent > 60) {
-            percentFormat.setPatternBackgroundColor(QColor("#ffd166"));
+        int threshold = thresholdSpin->value();
+
+        QXlsx::Format rowFormat = dataFormat;
+        if (percent >= threshold) {
+            rowFormat.setPatternBackgroundColor(QColor("#06d6a0")); // Geçti (yeşil)
         } else {
-            percentFormat.setPatternBackgroundColor(QColor("#06d6a0"));
+            rowFormat.setPatternBackgroundColor(QColor("#ff6b6b")); // Kaldı (kırmızı)
         }
 
-        xlsx.write(row, 1, type, dataFormat);
-        xlsx.write(row, 2, total, dataFormat);
-        xlsx.write(row, 3, used, dataFormat);
-        xlsx.write(row, 4, free, dataFormat);
-        xlsx.write(row, 5, QString("%1%").arg(percent, 0, 'f', 2), percentFormat);
+        xlsx.write(row, 1, type, rowFormat);
+        xlsx.write(row, 2, total, rowFormat);
+        xlsx.write(row, 3, used, rowFormat);
+        xlsx.write(row, 4, free, rowFormat);
+        xlsx.write(row, 5, QString("%1%").arg(percent, 0, 'f', 2), rowFormat);
     };
 
     writeRow(2, "STACK", lastStats.stackUsed, lastStats.stackTotal);
@@ -525,12 +583,11 @@ void MainWindow::exportToExcel() {
 
     if (xlsx.saveAs(path)) {
           #ifdef Q_OS_WIN
+        QMessageBox::information(this, "Başarılı",
+            QString("Excel dosyası başarıyla kaydedildi ve açılıyor\n"));
               QDesktopServices::openUrl(QUrl::fromLocalFile(path));
           #endif
-
-          QMessageBox::information(this, "Başarılı",
-              QString("Excel dosyası başarıyla kaydedildi ve açılıyor:\n%1").arg(path));
       } else {
-          QMessageBox::warning(this, "Hata", "Excel dosyası kaydedilemedi!");
+          QMessageBox::warning(this, "Hata", "Excel kaydedilemedi!");
       }
 }

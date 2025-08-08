@@ -28,6 +28,7 @@ protected:
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
+
 private:
     QVBoxLayout *mainLayout;
     QtCharts::QChartView *stackChartView, *flashChartView, *ramChartView;
@@ -38,12 +39,17 @@ private:
     QTextEdit *mapContentView;
     QSpinBox *greenMinSpin;
     QSpinBox *yellowMinSpin;
+    QSpinBox *thresholdSpin;
 
     void analyzeFile(const QString &filePath);
     void showPieChart(QtCharts::QChartView *view, const QString &title, double used, double total);
     void initializeMemoryTable();
     void updateMemoryTable();
     void showCharts();
+    void openUserGuide();
+    void openMapFullScreen();
+
+
 
     MemoryStats lastStats;
     ClickableLabel *dropLabel;

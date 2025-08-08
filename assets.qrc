@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/images">
+        <file>TEI_Logo.png</file>
+        <file>TEI_Logo.ico</file>
+    </qresource>
+</RCC>

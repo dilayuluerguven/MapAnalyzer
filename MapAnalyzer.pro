@@ -16,4 +16,8 @@ HEADERS += mainwindow.h \
            MemoryDetailDialog.h \
            clickablelabel.h
 
-RESOURCES +=
+RESOURCES += \
+    assets.qrc
+
+DISTFILES += docs/userGuide.pdf
+
